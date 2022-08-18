@@ -2,9 +2,11 @@ package producer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 
+	"github.com/Egor-Tihonov/RabiitMQ-proj/internal/models"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -21,8 +23,17 @@ func NewProducer() (*Producer, error) {
 	return &Producer{PCconn: conn}, nil
 }
 
-func (p *Producer) Publish(conn *amqp.Connection) error {
-	ch, err := conn.Channel()
+func (p *Producer) Publish(count int) error {
+	var messages []amqp.Publishing
+	for i := 1; i < count; i++ {
+		message := models.Message{Msg: "new massage"}
+		msg, err := json.Marshal(message)
+		if err != nil {
+			break
+		}
+		messages = append(messages, amqp.Publishing{Body: msg})
+	}
+	ch, err := p.PCconn.Channel()
 	if err != nil {
 		return err
 	}
@@ -38,19 +49,22 @@ func (p *Producer) Publish(conn *amqp.Connection) error {
 		return err
 	}
 	fmt.Println(q)
-	err = ch.PublishWithContext(
-		context.Background(),
-		"",
-		"Test",
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte("hello world!"),
-		},
-	)
-	if err != nil {
-		log.Fatalf("failed to publish message..., %e", err)
+	for _, a := range messages {
+		err = ch.PublishWithContext(
+			context.Background(),
+			"",
+			"Test",
+			false,
+			false,
+			amqp.Publishing{
+				ContentType: "text/plain",
+				Body:        a.Body,
+			},
+		)
+		if err != nil {
+			log.Fatalf("failed to publish message..., %e", err)
+			return err
+		}
 	}
 	fmt.Println("Successfully publish message...")
 	return nil

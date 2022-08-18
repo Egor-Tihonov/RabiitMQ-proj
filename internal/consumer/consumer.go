@@ -1,33 +1,47 @@
-package main
+package consumer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/Egor-Tihonov/RabiitMQ-proj/internal/models"
+	"github.com/Egor-Tihonov/RabiitMQ-proj/internal/repository"
+	"github.com/jackc/pgx/v4"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func main() {
-	conndb, err := pgxpool.Connect(context.Background(), "postgresql://postgres:123@localhost:5432/postgres")
-	if err != nil {
-		log.Fatalf("%e", err)
-	}
-	fmt.Println("Consummer...")
+type Consumer struct {
+	CConn *amqp.Connection
+}
+
+func NewConsumer() (*Consumer, error) {
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		log.Fatalf("failed to connect with rabbitmq..., %e", err)
+		return nil, err
 	}
-	defer conn.Close()
-	log.Println("Successfully connected to rabbitmq...")
-	ch, err := conn.Channel()
+	return &Consumer{CConn: conn}, nil
+}
+
+func (c *Consumer) Read(rps *repository.DB) error {
+	pgxBatch := pgx.Batch{}
+	ch, err := c.CConn.Channel()
+	q, err := ch.QueueDeclare(
+		"Test",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+
 	if err != nil {
-		log.Fatalf("%e", err)
+		return err
 	}
 	defer ch.Close()
 	msg, err := ch.Consume(
-		"Test",
+		q.Name,
 		"",
 		true,
 		false,
@@ -36,19 +50,23 @@ func main() {
 		nil,
 	)
 	if err != nil {
-		log.Fatalf("%e", err)
+		return err
 	}
-	forever := make(chan bool)
 	go func() {
 		for d := range msg {
-			fmt.Printf("Receiver messages: %s\n", d.Body)
-			_, err = conndb.Exec(context.Background(), "insert into tablerabbit(message) values($1)", string(d.Body))
+			message := models.Message{}
+			err = json.Unmarshal([]byte(d.Body), &message)
 			if err != nil {
-				log.Printf("error %e", err)
+				log.Fatalf("internal/consumer: unmarshal error, %e", err)
 			}
+			pgxBatch.Queue("insert into rablerabbir(msg) values($1)", message.Msg)
 		}
 	}()
 	fmt.Println("Successfully conntect to rabbitmq instance...")
-	fmt.Println("Wait for messages...")
-	<-forever
+	fmt.Println("Wait for sending messaes to db...")
+	err = rps.Write(context.Background(), &pgxBatch)
+	if err != nil {
+		return err
+	}
+	return nil
 }

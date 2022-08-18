@@ -6,6 +6,8 @@ import (
 	"github.com/Egor-Tihonov/RabiitMQ-proj/internal/producer"
 )
 
+const count = 2000
+
 func main() {
 	prod, err := producer.NewProducer()
 	if err != nil {
@@ -19,7 +21,7 @@ func main() {
 			log.Fatalf("connection error, %e", err)
 		}
 	}()
-	err = prod.Publish(prod.PCconn)
+	err = prod.Publish(count)
 	if err != nil {
 		log.Fatalf("error %e", err)
 	}
