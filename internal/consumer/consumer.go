@@ -27,6 +27,9 @@ func NewConsumer() (*Consumer, error) {
 func (c *Consumer) Read(rps *repository.DB) error {
 	pgxBatch := pgx.Batch{}
 	ch, err := c.CConn.Channel()
+	if err != nil {
+		return err
+	}
 	q, err := ch.QueueDeclare(
 		"Test",
 		false,
@@ -52,16 +55,16 @@ func (c *Consumer) Read(rps *repository.DB) error {
 	if err != nil {
 		return err
 	}
-	go func() {
+	go func(a *pgx.Batch) {
 		for d := range msg {
 			message := models.Message{}
 			err = json.Unmarshal([]byte(d.Body), &message)
 			if err != nil {
 				log.Fatalf("internal/consumer: unmarshal error, %e", err)
 			}
-			pgxBatch.Queue("insert into rablerabbir(msg) values($1)", message.Msg)
+			a.Queue("insert into rablerabbir(msg) values($1)", message.Msg)
 		}
-	}()
+	}(&pgxBatch)
 	fmt.Println("Successfully conntect to rabbitmq instance...")
 	fmt.Println("Wait for sending messaes to db...")
 	err = rps.Write(context.Background(), &pgxBatch)
