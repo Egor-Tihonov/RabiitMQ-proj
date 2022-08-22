@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"log"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -13,10 +14,11 @@ type DB struct {
 }
 
 func NewConnection() (*DB, error) {
-	conndb, err := pgxpool.Connect(context.Background(), "postgresql://postgres:123@localhost:5432/person")
+	conndb, err := pgxpool.Connect(context.Background(), "postgresql://postgres:123@localhost:5432/postgres")
 	if err != nil {
 		return nil, err
 	}
+	log.Println("create conn with db")
 	return &DB{Pool: conndb}, nil
 }
 

@@ -25,7 +25,7 @@ func NewProducer() (*Producer, error) {
 
 func (p *Producer) Publish(count int) error {
 	var messages []amqp.Publishing
-	for i := 1; i < 500; i++ {
+	for i := 1; i < count; i++ {
 		message := models.Message{Msg: "new massage"}
 		msg, err := json.Marshal(message)
 		if err != nil {
